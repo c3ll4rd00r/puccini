@@ -97,7 +97,7 @@ function createWorkflowProcess(id, vertex) {
 
 		var step = edge.target;
 		var stepID = edge.targetID;
-
+                
 		createWorkflowTask(process, step, stepID, tasks);
 	}
 
@@ -176,6 +176,7 @@ function createWorkflowProcess(id, vertex) {
 }
 
 function createWorkflowTask(process, step, stepID, tasks) {
+        
 	var name = step.properties.name;
 
 	var next = [];
@@ -184,15 +185,18 @@ function createWorkflowTask(process, step, stepID, tasks) {
 
 	// Iterate edges
 	var activities = [];
+        var nodes = [];
 	for (var ee =- 0; ee < step.edgesOut.length; ee++) {
 		var edge = step.edgesOut[ee];
-		if (tosca.isTosca(edge, 'NodeTemplateTarget'))
-			code += puccini.sprintf('\nnodeTemplates.push("%s");', edge.target.properties.name);
-		else if (tosca.isTosca(edge, 'GroupTarget'))
+		if (tosca.isTosca(edge, 'NodeTemplateTarget')) {
+			code += puccini.sprintf('\nnodeTemplates.push("%s");', edge.target.properties.name)
+                        nodes.push(edge.target.properties);
+                }		
+                else if (tosca.isTosca(edge, 'GroupTarget'))
 			code += puccini.sprintf('\ngroups.push("%s");', edge.target.properties.name);
-		else if (tosca.isTosca(edge, 'WorkflowActivity')) {
+		else if (tosca.isTosca(edge, 'WorkflowActivity')) { //code += puccini.sprintf('\nDEBUG: %s', edge)
 			// Put activities in the right sequence
-			var sequence = edge.properties.sequence;
+			var sequence = edge.properties.sequence 
 			activities[sequence] = edge.target.properties;
 		} else if (tosca.isTosca(edge, 'OnSuccess')) {
 			next.push(edge.target.properties.name);
@@ -207,7 +211,7 @@ function createWorkflowTask(process, step, stepID, tasks) {
 		if (activity.setNodeState)
 			code += puccini.sprintf('\nsetNodeState(nodeTemplates, groups, "%s");', activity.setNodeState);
 		else if (activity.callOperation)
-			code += puccini.sprintf('\ncallOperation(nodeTemplates, groups, "%s", "%s");', activity.callOperation.interface, activity.callOperation.operation);
+			code += puccini.sprintf('\ncallOperation(nodeTemplates, groups, "%s", "%s");', activity.callOperation.interface, nodes[a].interfaces[activity.callOperation.interface].operations[activity.callOperation.operation]);
 	}
 
 	var task = createScriptTask(process, stepID, name + ' step', code + '\n');
