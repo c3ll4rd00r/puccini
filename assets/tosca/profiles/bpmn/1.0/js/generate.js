@@ -181,7 +181,7 @@ function createWorkflowTask(process, step, stepID, tasks) {
 
 	var next = [];
 
-	var code = '\nvar nodeTemplates = [];\nvar groups = [];';
+	var code = 'import subprocess\n';
 
 	// Iterate edges
 	var activities = [];
@@ -189,11 +189,13 @@ function createWorkflowTask(process, step, stepID, tasks) {
 	for (var ee =- 0; ee < step.edgesOut.length; ee++) {
 		var edge = step.edgesOut[ee];
 		if (tosca.isTosca(edge, 'NodeTemplateTarget')) {
-			code += puccini.sprintf('\nnodeTemplates.push("%s");', edge.target.properties.name)
-                        nodes.push(edge.target.properties);
+			// code += puccini.sprintf('\nnodeTemplates.push("%s");', edge.target.properties.name)
+			            nodes.push(edge.target.properties);
+			code += ""
                 }		
                 else if (tosca.isTosca(edge, 'GroupTarget'))
-			code += puccini.sprintf('\ngroups.push("%s");', edge.target.properties.name);
+			// code += puccini.sprintf('\ngroups.push("%s");', edge.target.properties.name);
+			code += ""
 		else if (tosca.isTosca(edge, 'WorkflowActivity')) { //code += puccini.sprintf('\nDEBUG: %s', edge)
 			// Put activities in the right sequence
 			var sequence = edge.properties.sequence 
@@ -210,8 +212,23 @@ function createWorkflowTask(process, step, stepID, tasks) {
 		var activity = activities[a];
 		if (activity.setNodeState)
 			code += puccini.sprintf('\nsetNodeState(nodeTemplates, groups, "%s");', activity.setNodeState);
-		else if (activity.callOperation)
-			code += puccini.sprintf('\ncallOperation(nodeTemplates, groups, "%s", "%s");', activity.callOperation.interface, nodes[a].interfaces[activity.callOperation.interface].operations[activity.callOperation.operation]);
+		else if (activity.callOperation) {
+			if (Object.keys(nodes[a].interfaces[activity.callOperation.interface].operations[activity.callOperation.operation].implementation).length > 0) {
+				var ins = [];
+				if (nodes[a].interfaces[activity.callOperation.interface].operations[activity.callOperation.operation].inputs){
+					for (var i of Object.values(nodes[a].interfaces[activity.callOperation.interface].operations[activity.callOperation.operation].inputs)) {
+						ins.push(i)
+					}
+				}
+				
+				code += puccini.sprintf("subprocess.call(['".concat(nodes[a]
+					.interfaces[activity.callOperation.interface]
+					.operations[activity.callOperation.operation].implementation)
+					.concat("', '")
+					.concat(ins.reverse().join('\',\''))
+					.concat("'])\n"));
+			}
+		}
 	}
 
 	var task = createScriptTask(process, stepID, name + ' step', code + '\n');
@@ -246,7 +263,7 @@ function createScriptTask(process, id, name, code) {
 	var task = process.createElement('bpmn:scriptTask');
 	task.createAttr('id', id);
 	task.createAttr('name', name);
-	task.createAttr('scriptFormat', 'javascript');
+	task.createAttr('scriptFormat', 'python');
 	var script = task.createElement('bpmn:script');
 	script.setText(code);
 	return task;
